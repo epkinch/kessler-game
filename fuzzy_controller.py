@@ -70,9 +70,10 @@ class FuzzyController(KesslerController):
         theta_delta['PM'] = fuzz.trimf(theta_delta.universe, [ math.pi/90,  math.pi/45,  math.pi/30])
         theta_delta['PL'] = fuzz.smf(theta_delta.universe,     math.pi/45,  math.pi/30)
 
-        threat_level['L'] = fuzz.trimf(threat_level.universe, [0.0,  0.0, 0.25])
-        threat_level['M'] = fuzz.trimf(threat_level.universe, [0.0,  0.5, 1.0])
-        threat_level['H'] = fuzz.trimf(threat_level.universe, [0.75, 1.0, 1.0])
+        threat_level['L']  = fuzz.trimf(threat_level.universe, [0.0,  0.0, 0.25])
+        threat_level['M']  = fuzz.trimf(threat_level.universe, [0.0,  0.3, 0.6])
+        threat_level['H']  = fuzz.trimf(threat_level.universe, [0.4,  0.7, 1.0])
+        threat_level['VH'] = fuzz.trimf(threat_level.universe, [0.75, 1.0, 1.0])
 
         # Output variables
         # ================
@@ -128,10 +129,14 @@ class FuzzyController(KesslerController):
         # rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['PM'], (ship_turn['Right'], ship_thrust['SlowForward'], ship_fire['No'], ship_mine['No'])))
         # rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['PL'], (ship_turn['HardRight'], ship_thrust['SlowForward'], ship_fire['No'], ship_mine['No'])))
 
-        rules.append(ctrl.Rule(threat_level['H'] & theta_delta['NS'], (ship_thrust['Reverse'], ship_turn['HardLeft'], ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(threat_level['H'] & theta_delta['PS'], (ship_thrust['Reverse'], ship_turn['HardRight'], ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(threat_level['H'] & theta_delta['NM'], (ship_thrust['Reverse'], ship_turn['Left'], ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(threat_level['H'] & theta_delta['PM'], (ship_thrust['Reverse'], ship_turn['Right'], ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['VS'] & ~theta_delta['NL'] & ~theta_delta['PL'] & threat_level['L'],  (ship_thrust['Zero'],    ship_turn['Zero'], ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['VS'] & (theta_delta['NL'] | theta_delta['NM']) & ~threat_level['L'], (ship_thrust['Forward'], ship_turn['Left'], ship_fire['No'],  ship_mine['No'])))
+
+
+        rules.append(ctrl.Rule(threat_level['VH'] & theta_delta['NS'], (ship_thrust['Reverse'], ship_turn['HardLeft'], ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(threat_level['VH'] & theta_delta['PS'], (ship_thrust['Reverse'], ship_turn['HardRight'], ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(threat_level['VH'] & theta_delta['NM'], (ship_thrust['Reverse'], ship_turn['Left'], ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(threat_level['VH'] & theta_delta['PM'], (ship_thrust['Reverse'], ship_turn['Right'], ship_fire['Yes'], ship_mine['No'])))
 
         self.control_system = ctrl.ControlSystem(rules)
 
@@ -146,9 +151,10 @@ class FuzzyController(KesslerController):
                 about all asteroids.
 
         Returns:
-            most_dangerous_asteroid: The predicted most dangerous asteroid for
-                the given ship based on the current state of the game.
-            threat_level: The threat level of the asteroid found.
+            (most_dangerous_asteroid, threat_level): A tuple containing the
+                predicted most dangerous asteroid for the given ship based
+                on the current state of the game and the threat level of
+                this asteroid.
         """
         most_dangerous = None
         highest_threat = -1
@@ -163,14 +169,16 @@ class FuzzyController(KesslerController):
             velocity_threat = min(1.0, asteroid_velocity.magnitude() / 200.0)
 
             if intercept_time > 0.0:
-                intercept_threat = max(0, 1 - intercept_time / 0.1)
+                intercept_threat = max(0, 1 - intercept_time / 100.0)
 
                 # Combined threat score where we prioritize asteroids that will
                 # intercept the ship.
-                threat_score = (0.6 * intercept_threat + 0.3 * distance_threat + 0.75 * size_threat + 0.25 * velocity_threat)
+                threat_score = (0.5 * intercept_threat + 0.3 * distance_threat + 0.125 * size_threat + 0.075 * velocity_threat)
+                # print(f"DT: {distance_threat:.4f}, ST: {size_threat:.4f}, VT: {velocity_threat:.4f}, IT: {intercept_threat:.4f}, TT: {threat_score:.4f}, T: {intercept_time:0.4f}")
             else:
                 # Combined threat score where we prioritize the distance.
-                threat_score = (0.9 * distance_threat + 0.75 * size_threat + 0.25 * velocity_threat)
+                threat_score = (0.8 * distance_threat + 0.125 * size_threat + 0.075 * velocity_threat)
+                # print(f"DT: {distance_threat:.4f}, ST: {size_threat:.4f}, VT: {velocity_threat:.4f}, TT: {threat_score:.4f}")
 
             if threat_score > highest_threat:
                 highest_threat = threat_score
@@ -295,7 +303,7 @@ class FuzzyController(KesslerController):
         # Create control system simulation
         controller = ctrl.ControlSystemSimulation(self.control_system, flush_after_run=1)
 
-        # controller.input['bullet_time'] = min(bullet_t, 0.99) if bullet_t else 1.0
+        controller.input['bullet_time'] = min(bullet_t, 0.99) if bullet_t else 1.0
         controller.input['theta_delta'] = shooting_theta
         controller.input['threat_level'] = threat_level
         # controller.input['asteroid_distance'] = min(distance, 999)
