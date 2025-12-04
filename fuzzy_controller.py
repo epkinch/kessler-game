@@ -12,43 +12,14 @@ class FuzzyController(KesslerController):
     def __init__(self):
         self.eval_frames = 0
 
-        # The following are for threat assessment
-        # Asteroid max distance is dependent on the map size which is by
-        # default 1000x800 giving a max distance on the diagonal.
-        # asteroid_distance = ctrl.Antecedent(np.arange(0, 1300, 10), 'asteroid_distance')
-
-        # Asteroids can only be a size from 1 to 4
-        # asteroid_size = ctrl.Antecedent(np.arange(1, 5, 1), 'asteroid_size')
-
-        # Initial max velocity of an asteroid is based on its size which is
-        # 165.0 m/s for a size 1 asteroid, see asteroid.py.
-        # asteroid_velocity = ctrl.Antecedent(np.arange(0, 200, 10), 'asteroid_velocity')
-
-        # Asteroid distance sets
-        # asteroid_distance['VClose'] = fuzz.zmf(asteroid_distance.universe,    0, 300)
-        # asteroid_distance['Close']  = fuzz.trimf(asteroid_distance.universe, [100, 400, 700])
-        # asteroid_distance['Medium'] = fuzz.trimf(asteroid_distance.universe, [350, 650, 950])
-        # asteroid_distance['Far']    = fuzz.trimf(asteroid_distance.universe, [600, 900, 1200])
-        # asteroid_distance['VFar']   = fuzz.smf(asteroid_distance.universe,    1000, 1300)
-
-        # Asteroid size sets
-        # asteroid_size['Small']  = fuzz.trimf(asteroid_size.universe, [1.0, 1.0, 2.0])
-        # asteroid_size['Medium'] = fuzz.trimf(asteroid_size.universe, [1.5, 2.5, 3.5])
-        # asteroid_size['Large']  = fuzz.trimf(asteroid_size.universe, [3.0, 4.0, 4.0])
-
-        # Asteroid velocity sets
-        # asteroid_velocity['Slow']   = fuzz.trimf(asteroid_velocity.universe, [0,   0,   100])
-        # asteroid_velocity['Medium'] = fuzz.trimf(asteroid_velocity.universe, [50,  100, 150])
-        # asteroid_velocity['Fast']   = fuzz.trimf(asteroid_velocity.universe, [100, 200, 200])
-
         # Input variables
         # ===============
         # Bullet time is the amount of time the bullet needs to reach its
         # target and is also an approximation for the distance to the asteroid.
-        bullet_time = ctrl.Antecedent(np.arange(0, 1.0, 0.002), 'bullet_time')
+        bullet_time = ctrl.Antecedent(np.arange(0, 2.0, 0.002), 'bullet_time')
         # Theta delta is the amount the ship needs to turn to complete its
         # next action.
-        theta_delta = ctrl.Antecedent(np.linspace(-math.pi, math.pi, 25), 'theta_delta')
+        theta_delta = ctrl.Antecedent(np.linspace(-math.pi, math.pi, 181), 'theta_delta')
 
         # Threat level is a threat detection number that combines the distance,
         # size, and velocity of asteroids along with taking into account any
@@ -94,11 +65,13 @@ class FuzzyController(KesslerController):
         ship_thrust['Forward']     = fuzz.trimf(ship_thrust.universe, [ 300.0,  500.0,  500.0])
 
         # Output sets for turn rate
-        ship_turn['HardLeft']  = fuzz.trimf(ship_turn.universe, [-180, -180, -120])
-        ship_turn['Left']      = fuzz.trimf(ship_turn.universe, [-120,  -60,   60])
+        ship_turn['HardRight'] = fuzz.trimf(ship_turn.universe, [-180, -180, -120])
+        ship_turn['MedRight']  = fuzz.trimf(ship_turn.universe, [-180, -120,  -60])
+        ship_turn['Right']     = fuzz.trimf(ship_turn.universe, [-120,  -60,   60])
         ship_turn['Zero']      = fuzz.trimf(ship_turn.universe, [ -60,    0,   60])
-        ship_turn['Right']     = fuzz.trimf(ship_turn.universe, [ -60,   60,  120])
-        ship_turn['HardRight'] = fuzz.trimf(ship_turn.universe, [ 120,  180,  180])
+        ship_turn['Left']      = fuzz.trimf(ship_turn.universe, [ -60,   60,  120])
+        ship_turn['MedLeft']   = fuzz.trimf(ship_turn.universe, [  60,  120,  180])
+        ship_turn['HardLeft']  = fuzz.trimf(ship_turn.universe, [ 120,  180,  180])
 
         # Output sets for fire and mine
         ship_fire['Yes'] = fuzz.trimf(ship_fire.universe, [ 0,  1, 1])
@@ -106,69 +79,52 @@ class FuzzyController(KesslerController):
         ship_mine['Yes'] = fuzz.trimf(ship_mine.universe, [ 0,  1, 1])
         ship_mine['No']  = fuzz.trimf(ship_mine.universe, [-1, -1, 0])
 
-        # Fuzzy rules
+        # Original Fuzzy rules
         # ===========
         rules = []
 
-        # Very close, large, fast asteroids
-        # rules.append(ctrl.Rule(asteroid_distance['VClose'] & asteroid_size['Large'] & asteroid_velocity['Fast'], (ship_turn['HardRight'], ship_thrust['Reverse'], ship_fire['No'], ship_mine['Yes'])))
-        # rules.append(ctrl.Rule(asteroid_distance['VClose'] & asteroid_size['Medium'] & asteroid_velocity['Fast'], (ship_turn['Right'], ship_thrust['Reverse'], ship_fire['No'], ship_mine['Yes'])))
-        # rules.append(ctrl.Rule(asteroid_distance['VClose'] & asteroid_size['Large'] & asteroid_velocity['Medium'], (ship_turn['Left'], ship_thrust['Reverse'], ship_fire['No'], ship_mine['Yes'])))
+        rules.append(ctrl.Rule((theta_delta['NM'] | theta_delta['NS']) & (threat_level['L'] | threat_level['M']),                      (ship_thrust['Zero'],        ship_turn['Right'],      ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule((theta_delta['PM'] | theta_delta['PS']) & (threat_level['L'] | threat_level['M']),                      (ship_thrust['Zero'],        ship_turn['Left'],      ship_fire['Yes'], ship_mine['No'])))
 
-        # Good shooting opportunities
-        # rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['Z'], (ship_turn['Zero'], ship_thrust['Zero'], ship_fire['Yes'], ship_mine['No'])))
-        # rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['NS'], (ship_turn['Left'], ship_thrust['Zero'], ship_fire['Yes'], ship_mine['No'])))
-        # rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['PS'], (ship_turn['Right'], ship_thrust['Zero'], ship_fire['Yes'], ship_mine['No'])))
-        # rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['Z'], (ship_turn['Zero'], ship_thrust['Zero'], ship_fire['Yes'], ship_mine['No'])))
-        # rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['NS'], (ship_turn['Left'], ship_thrust['Zero'], ship_fire['Yes'], ship_mine['No'])))
-        # rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['PS'], (ship_turn['Right'], ship_thrust['Zero'], ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['VS'] & theta_delta['NL'] & (threat_level['H'] | threat_level['VH']),                       (ship_thrust['SlowReverse'],     ship_turn['Zero'],  ship_fire['Yes'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['VS'] & theta_delta['PL'] & (threat_level['H'] | threat_level['VH']),                       (ship_thrust['SlowReverse'],     ship_turn['Zero'], ship_fire['Yes'],  ship_mine['No'])))
 
-        # Rule Turning toward targets
-        # rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['NL'], (ship_turn['HardLeft'], ship_thrust['SlowForward'], ship_fire['No'], ship_mine['No'])))
-        # rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['NM'], (ship_turn['Left'], ship_thrust['SlowForward'], ship_fire['No'], ship_mine['No'])))
-        # rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['NS'], (ship_turn['Left'], ship_thrust['SlowForward'], ship_fire['Yes'], ship_mine['No'])))
-        # rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['PS'], (ship_turn['Right'], ship_thrust['SlowForward'], ship_fire['Yes'], ship_mine['No'])))
-        # rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['PM'], (ship_turn['Right'], ship_thrust['SlowForward'], ship_fire['No'], ship_mine['No'])))
-        # rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['PL'], (ship_turn['HardRight'], ship_thrust['SlowForward'], ship_fire['No'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['VS'] & theta_delta['NS'] & (threat_level['H'] | threat_level['VH']),                       (ship_thrust['SlowReverse'],     ship_turn['HardRight'], ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['VS'] & theta_delta['Z'] & (threat_level['H'] | threat_level['VH']),                        (ship_thrust['SlowReverse'],     ship_turn['Zero'],      ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['VS'] & theta_delta['PS'] & (threat_level['H'] | threat_level['VH']),                       (ship_thrust['SlowReverse'],     ship_turn['HardLeft'],  ship_fire['Yes'], ship_mine['No'])))
+
+        rules.append(ctrl.Rule(bullet_time['VS'] & theta_delta['NL'] & (threat_level['L'] | threat_level['M']),                        (ship_thrust['SlowForward'],     ship_turn['HardLeft'], ship_fire['No'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['VS'] & theta_delta['PL'] & (threat_level['L'] | threat_level['M']),                        (ship_thrust['SlowForward'],     ship_turn['HardRight'],  ship_fire['No'],  ship_mine['No'])))
 
 
-        rules.append(ctrl.Rule(~theta_delta['NL'] & ~theta_delta['PL'] & (threat_level['L'] | threat_level['M']),                                         (ship_thrust['Zero'],    ship_turn['Zero'],      ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['VS'] & (theta_delta['NL'] | theta_delta['NM']) & (threat_level['H'] | threat_level['VH']),                    (ship_thrust['Reverse'], ship_turn['HardLeft'],      ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['VS'] & (theta_delta['PL'] | theta_delta['PM']) & (threat_level['H'] | threat_level['VH']),                    (ship_thrust['Reverse'], ship_turn['HardRight'],     ship_fire['Yes'], ship_mine['No'])))
-
-        rules.append(ctrl.Rule(bullet_time['VS'] & theta_delta['NS'] & (threat_level['H'] | threat_level['VH']),                                          (ship_thrust['Reverse'], ship_turn['HardRight'],     ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['VS'] & theta_delta['Z'] & (threat_level['H'] | threat_level['VH']),                                           (ship_thrust['Reverse'], ship_turn['Zero'],      ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['VS'] & theta_delta['PS'] & (threat_level['H'] | threat_level['VH']),                                          (ship_thrust['Reverse'], ship_turn['HardLeft'],      ship_fire['Yes'], ship_mine['No'])))
-
-        rules.append(ctrl.Rule(bullet_time['VS'] & theta_delta['NL'] & (threat_level['L'] | threat_level['M']),                                           (ship_thrust['Forward'], ship_turn['HardRight'], ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['VS'] & theta_delta['PL'] & (threat_level['L'] | threat_level['M']),                                           (ship_thrust['Forward'], ship_turn['HardLeft'],  ship_fire['Yes'], ship_mine['No']))) # 6
+        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['Z'],                                                                    (ship_thrust['SlowReverse'], ship_turn['Zero'],  ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['NS'],                                                                   (ship_thrust['SlowReverse'], ship_turn['Left'], ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['PS'],                                                                   (ship_thrust['SlowReverse'], ship_turn['Right'],  ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['NM'],                                                                   (ship_thrust['SlowReverse'], ship_turn['MedLeft'], ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['PM'],                                                                   (ship_thrust['SlowReverse'], ship_turn['MedRight'],  ship_fire['Yes'], ship_mine['No'])))
 
 
-        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['Z'] & ~threat_level['VH'],                                                                 (ship_thrust['Reverse'],    ship_turn['Zero'],      ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['Z'] &  threat_level['VH'],                                                                 (ship_thrust['Reverse'], ship_turn['Zero'],      ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['NS'] & (threat_level['H'] | threat_level['VH']),                                           (ship_thrust['Reverse'], ship_turn['HardRight'], ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['PS'] & (threat_level['H'] | threat_level['VH']),                                           (ship_thrust['Reverse'], ship_turn['HardLeft'],  ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['NL'] & (threat_level['L'] | threat_level['M']),                                            (ship_thrust['Reverse'],    ship_turn['HardRight'],     ship_fire['Yes'],  ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['NL'] & (threat_level['H'] | threat_level['VH']),                                           (ship_thrust['Reverse'], ship_turn['HardLeft'],      ship_fire['Yes'],  ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['PL'] & (threat_level['L'] | threat_level['M']),                                            (ship_thrust['Forward'],    ship_turn['HardRight'],      ship_fire['Yes'],  ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['PL'] & (threat_level['H'] | threat_level['VH']),                                           (ship_thrust['SlowForward'], ship_turn['HardRight'],     ship_fire['Yes'],  ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['NM'] & (threat_level['H'] | threat_level['VH']),                                           (ship_thrust['SlowForward'], ship_turn['HardLeft'], ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['PM'] & (threat_level['H'] | threat_level['VH']),                                           (ship_thrust['SlowForward'], ship_turn['HardRight'],  ship_fire['Yes'], ship_mine['No']))) # 16
+        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['NL'] & (threat_level['L'] | threat_level['M']),                         (ship_thrust['Zero'],        ship_turn['HardLeft'], ship_fire['No'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['NL'] & (threat_level['H'] | threat_level['VH']),                        (ship_thrust['Zero'],        ship_turn['HardRight'],  ship_fire['No'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['PL'] & (threat_level['L'] | threat_level['M']),                         (ship_thrust['Forward'],     ship_turn['HardLeft'], ship_fire['No'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['PL'] & (threat_level['H'] | threat_level['VH']),                        (ship_thrust['SlowForward'], ship_turn['HardLeft'], ship_fire['No'],  ship_mine['No'])))
+
+        rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['NL'],                                                                   (ship_thrust['SlowForward'], ship_turn['HardLeft'], ship_fire['No'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['NM'],                                                                   (ship_thrust['SlowForward'], ship_turn['MedLeft'],  ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['NS'],                                                                   (ship_thrust['SlowForward'], ship_turn['Left'],     ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['Z'],                                                                    (ship_thrust['SlowForward'], ship_turn['Zero'],     ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['PS'],                                                                   (ship_thrust['SlowForward'], ship_turn['Left'],     ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['PM'],                                                                   (ship_thrust['SlowForward'], ship_turn['MedLeft'],  ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['PL'],                                                                   (ship_thrust['SlowForward'], ship_turn['HardLeft'], ship_fire['No'],  ship_mine['No'])))
 
 
-        rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['NL'],                                                                                      (ship_thrust['SlowForward'], ship_turn['HardRight'], ship_fire['No'],  ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['M'] & (theta_delta['NM'] | theta_delta['NS']),                                                                (ship_thrust['SlowForward'], ship_turn['HardRight'],     ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['Z'],                                                                                       (ship_thrust['SlowForward'], ship_turn['Zero'],      ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['M'] & (theta_delta['PM'] | theta_delta['PS']),                                                                (ship_thrust['SlowForward'], ship_turn['HardLeft'],      ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['PL'],                                                                                      (ship_thrust['SlowForward'], ship_turn['HardLeft'],  ship_fire['No'],  ship_mine['No'])))
-
-
-        rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['NL'],                                                                (ship_thrust['SlowForward'], ship_turn['HardRight'], ship_fire['No'],  ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['L'] & (theta_delta['NM'] | theta_delta['NS']),                                          (ship_thrust['Forward'], ship_turn['Right'], ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['Z'],                                                                 (ship_thrust['Forward'], ship_turn['Zero'], ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['L'] & (theta_delta['PM'] | theta_delta['PS']),                                          (ship_thrust['Forward'], ship_turn['Left'], ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['PL'],                                                                (ship_thrust['SlowForward'], ship_turn['HardLeft'], ship_fire['No'],  ship_mine['No'])))
-
+        rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['NL'],                                                                   (ship_thrust['SlowForward'], ship_turn['HardLeft'],  ship_fire['No'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['NM'],                                                                   (ship_thrust['Forward'],     ship_turn['MedLeft'],   ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['NS'],                                                                   (ship_thrust['Forward'],     ship_turn['Left'],      ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['Z'],                                                                    (ship_thrust['Forward'],     ship_turn['Zero'],      ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['PS'],                                                                   (ship_thrust['Forward'],     ship_turn['Right'],     ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['PM'],                                                                   (ship_thrust['Forward'],     ship_turn['MedRight'],  ship_fire['Yes'], ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['PL'],                                                                   (ship_thrust['SlowForward'], ship_turn['HardRight'], ship_fire['No'],  ship_mine['No'])))
 
         self.control_system = ctrl.ControlSystem(rules)
 
@@ -201,24 +157,20 @@ class FuzzyController(KesslerController):
 
             # Threat calculation: closer, larger, faster = more dangerous
             distance_threat = max(0, 1.0 - dist_vec.magnitude() / 1300.0)
-            size_threat = asteroid["size"] / 4.0
-            velocity_threat = min(1.0, asteroid_velocity.magnitude() / 200.0)
-            intercept_time = -1.0
 
             # Not guaranteed to hit the ship, but gives a good estimate on
             # which asteroids if a collision could happen
             if angle_between < 15.0:
                 intercept_time = dist_vec.magnitude() / asteroid_velocity.magnitude()
-
-            if intercept_time > 0.0:
                 intercept_threat = max(0, 1 - intercept_time / 100.0)
+                size_threat = asteroid["size"] / 4.0
+                velocity_threat = min(1.0, asteroid_velocity.magnitude() / 200.0)
 
                 # Combined threat score where we prioritize asteroids that will
                 # intercept the ship.
-                threat_score = (0.4 * intercept_threat + 0.4 * distance_threat + 0.075 * size_threat + 0.025 * velocity_threat)
+                threat_score = (0.5 * intercept_threat + 0.4 * distance_threat + 0.025 * size_threat + 0.075 * velocity_threat)
             else:
-                # Combined threat score where we prioritize the distance.
-                threat_score = distance_threat #(0.9 * distance_threat + 0.075 * size_threat + 0.025 * velocity_threat)
+                threat_score = distance_threat
 
             if threat_score > highest_threat:
                 highest_threat = threat_score
@@ -244,6 +196,7 @@ class FuzzyController(KesslerController):
                 time it will take for a bullet to intersect the given asteroid.
         """
         ship_position     = Vec2D(ship_state["position"])
+        ship_velocity     = Vec2D(ship_state["velocity"])
         asteroid_position = Vec2D(asteroid["position"])
         asteroid_velocity = Vec2D(asteroid["velocity"])
 
@@ -263,7 +216,7 @@ class FuzzyController(KesslerController):
 
         asteroid_vel = asteroid_velocity.magnitude()
         ship_ast_distance = asteroid_ship_vec.magnitude()
-        obj_speed = 800.0
+        obj_speed = 800.0 + ship_velocity.magnitude()
 
         # Applying the Law of Cosines on the triangle formed by the ship
         # velocity, asteroid velocity, and ship-asteroid distance vectors,
@@ -298,9 +251,16 @@ class FuzzyController(KesslerController):
 
 
     def determine_turn_rate(self, intercept_time: float, ship_state: ShipState, asteroid: AsteroidView) -> float:
+        """Determines the amount the ship must turn so that a bullet may intercept the asteriod.
+
+        Arguments:
+            intercept_time: The amount of time until an interception occurs.
+            ship_state: The current state of the ship.
+            asteroid: The asteroid to target.
+        """
         ship_position = Vec2D(ship_state["position"])
-        asteroid_position = Vec2D(asteroid["position"])
-        asteroid_velocity = Vec2D(asteroid["velocity"])
+        asteroid_position  = Vec2D(asteroid["position"])
+        asteroid_velocity  = Vec2D(asteroid["velocity"])
         intercept = asteroid_position + (intercept_time + 1/30) * asteroid_velocity
         ship_intercept_angle = math.atan2((intercept.y - ship_position.y), (intercept.x - ship_position.x))
 
@@ -340,9 +300,6 @@ class FuzzyController(KesslerController):
         controller.input['bullet_time'] = min(bullet_t, 0.99) if bullet_t else 1.0
         controller.input['theta_delta'] = shooting_theta
         controller.input['threat_level'] = threat_level
-        # controller.input['asteroid_distance'] = min(distance, 999)
-        # controller.input['asteroid_size'] = target_asteroid["size"]
-        # controller.input['asteroid_velocity'] = min(asteroid_vel, 399)
 
         try:
             controller.compute()
