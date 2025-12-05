@@ -1,3 +1,31 @@
+"""
+Fuzzy Controller for Group 15:
+==============================
+Provides a fuzzy controller that can use learned values from a genetic algorithm
+to optimize its fuzzy sets. This fuzzy controller takes an optional chromosome
+argument and when it is not specified, then all fuzzy sets use predefined values,
+otherwise it will take the fuzzy set parameters from this chromosome.
+    If this file is executed as a script, then a genetic algorithm can be executed
+with configurable population size and generation goal parameters, for example:
+
+python group15_controller -p 10
+
+will execute a genetic algorithm using a population size of 10 and
+
+python group15_controller -g 30
+
+will execute a genetic algorithm having a generation goal of 30. Population size
+can be specified in a range from 1 to 50 and the generation goal can be specified
+in a range from 1 to 10,000. If neither of these arguments are provided, then a
+genetic algorithm with a population size and generation goal of 20 will be run.
+    After the genetic algorithm has been executed, it will create a file called
+solution.dat in the directory this script is placed in which the information about
+the best chromosome found will be saved including its fitness, the population size
+used, and the generation goal on its first line, then the genes on all following
+lines. When the fuzzy controller class is used, it will search for this solution
+file automatically and pull the gene data from it.
+"""
+
 import os
 import math
 import argparse
@@ -11,7 +39,7 @@ import EasyGA as ga
 from EasyGA.structure import Chromosome
 from kesslergame.state_models import GameState, ShipState, AsteroidView
 
-from kesslergame import KesslerController, Scenario, TrainerEnvironment, GraphicsType
+from kesslergame import KesslerController, Scenario, TrainerEnvironment
 
 
 BULLET_TIME_UNIVERSE  = np.linspace(0, 2.0, 1001)
@@ -23,7 +51,13 @@ SHIP_TURN_UNIVERSE    = np.linspace(-180.0, 180.0, 361)
 
 class FuzzyController(KesslerController):
     def __init__(self, chromosome: Chromosome = None):
-        """
+        """Initializes a fuzzy controller with an optional chromosome.
+
+        If the chromosome is specified, then it must provide at least 78 genes
+        to populate all fuzzy sets. All genes after the 78th will be ignored.
+
+        Arguments:
+            chromosome: The chromosome containing fuzzy set parameters.
         """
         self.eval_frames = 0
 
@@ -47,11 +81,14 @@ class FuzzyController(KesslerController):
         ship_fire   = ctrl.Consequent(np.arange(-1.0, 1.0, 0.1), 'ship_fire')
         ship_mine   = ctrl.Consequent(np.arange(-1.0, 1.0, 0.1), 'ship_mine')
 
-        if os.path.isfile(SOLUTION_PATH):
+        # We want to prioritize the chromosome passed in as we could be
+        # attempting to run the genetic algorithm while the solution.dat
+        # file already exists.
+        if os.path.isfile(SOLUTION_PATH) and chromosome is None:
             with open(SOLUTION_PATH, 'r') as file:
                 lines = file.readlines()
                 training_data = lines[0].split(", ")
-                print(f"Solution exists in solution.ga whose fitness is {training_data[0]} (fitness is between 0.0 and 1.0).")
+                print(f"Solution exists in solution.dat whose fitness is {training_data[0]} (fitness is between 0.0 and 1.0).")
                 print(f"This was obtained using a population size of {training_data[1]} and a generation goal of {training_data[2]}.")
                 chromosome = Chromosome([float(value) for value in lines[1:]])
 
@@ -182,6 +219,10 @@ class FuzzyController(KesslerController):
     def find_most_dangerous_asteroid(self, ship_state: ShipState, game_state: GameState) -> tuple[AsteroidView, float]:
         """Find the most dangerous asteroid based on distance, size, and velocity.
 
+        Attempts to prioritize any asteroid that will intercept the ship,
+        prioritizing larger and faster asteroids, but if none will, then it
+        will prioritize based on distance.
+
         Arguments:
             ship_state: The state of the ship to find the most dangerous
                 asteroid for.
@@ -202,28 +243,32 @@ class FuzzyController(KesslerController):
             asteroid_position = Vec2D(asteroid["position"])
             asteroid_velocity = Vec2D(asteroid["velocity"])
             dist_vec = ship_position - asteroid_position
-            angle_between = math.acos(min(dist_vec.dot_prod(asteroid_velocity) / (dist_vec.magnitude() * asteroid_velocity.magnitude()), 1.0))
-            angle_between = angle_between * 180.0 / math.pi
 
             # Threat calculation: closer, larger, faster = more dangerous
             distance_threat = max(0, 1.0 - dist_vec.magnitude() / 1300.0)
 
-            # Not guaranteed to hit the ship, but gives a good estimate on
-            # which asteroids if a collision could happen
-            if angle_between < 15.0:
-                intercept_time = dist_vec.magnitude() / asteroid_velocity.magnitude()
-                intercept_threat = max(0, 1 - intercept_time / 100.0)
-                size_threat = asteroid["size"] / 4.0
-                velocity_threat = min(1.0, asteroid_velocity.magnitude() / 200.0)
+            if asteroid_velocity.magnitude() > 0.0:
+                angle_between = math.acos(min(dist_vec.dot_prod(asteroid_velocity) / (dist_vec.magnitude() * asteroid_velocity.magnitude()), 1.0))
+                angle_between = angle_between * 180.0 / math.pi
 
-                # Combined threat score where we prioritize asteroids that will
-                # intercept the ship.
-                threat_score = (0.5 * intercept_threat + 0.4 * distance_threat + 0.075 * size_threat + 0.025 * velocity_threat)
+                # Not guaranteed to hit the ship, but gives a good estimate on
+                # which asteroids if a collision could happen
+                if angle_between < 15.0:
+                    intercept_time = dist_vec.magnitude() / asteroid_velocity.magnitude()
+                    intercept_threat = max(0, 1 - intercept_time / 100.0)
+                    size_threat = asteroid["size"] / 4.0
+                    velocity_threat = min(1.0, asteroid_velocity.magnitude() / 200.0)
+
+                    # Combined threat score where we prioritize asteroids that will
+                    # intercept the ship.
+                    threat_score = (0.5 * intercept_threat + 0.4 * distance_threat + 0.075 * size_threat + 0.025 * velocity_threat)
+                else:
+                    # When the asteroid won't hit the ship, it's best to only
+                    # prioritize the distance, otherwise the ship may prioritize
+                    # further away but larger asteroids that don't make sense
+                    # to target at that point in time.
+                    threat_score = distance_threat
             else:
-                # When the asteroid won't hit the ship, it's best to only
-                # prioritize the distance, otherwise the ship may prioritize
-                # further away but larger asteroids that don't make sense
-                # to target at that point in time.
                 threat_score = distance_threat
 
             if threat_score > highest_threat:
@@ -250,7 +295,6 @@ class FuzzyController(KesslerController):
                 time it will take for a bullet to intersect the given asteroid.
         """
         ship_position     = Vec2D(ship_state["position"])
-        ship_velocity     = Vec2D(ship_state["velocity"])
         asteroid_position = Vec2D(asteroid["position"])
         asteroid_velocity = Vec2D(asteroid["velocity"])
 
@@ -305,6 +349,18 @@ class FuzzyController(KesslerController):
 
 
     def determine_turn_rate(self, intercept_time: float, ship_state: ShipState, asteroid: AsteroidView) -> float:
+        """"Determines the angle the ship must rotate to be able to shoot the given asteroid.
+
+        Arguments:
+            intercept_time: The amount of time it will take a bullet to
+                intercept the ship.
+            ship_state: The current state of the ship including its position
+                and velocity.
+            asteroid: The asteroid the ship is attempting to shoot.
+
+        Returns:
+            shooting_theta: The amount the ship must rotate to shoot the given asteroid.
+        """
         ship_curr_position = Vec2D(ship_state["position"])
         ship_velocity      = Vec2D(ship_state["velocity"])
         ship_position      = ship_curr_position + ship_velocity * (1/30)
@@ -316,7 +372,6 @@ class FuzzyController(KesslerController):
         # The amount we need to turn the ship to aim at where we want to shoot
         shooting_theta = ship_intercept_angle - (math.pi/180 * ship_state["heading"])
         shooting_theta = (shooting_theta + math.pi) % (2 * math.pi) - math.pi
-
         return shooting_theta
 
 
@@ -436,33 +491,22 @@ class Vec2D:
 
 
     def dot_prod(self, other: Vec2D) -> int | float:
+        """Returns the dot product of the vector with the given vector."""
         return self._x * other._x + self._y * other._y
 
 
     def __mul__(self, other: int | float) -> Vec2D:
-        """A new vector whose coordinates are scaled by the given `other` value.
-
-        Arguments:
-            other: A scalar value to scale the values of the vector.
-        """
+        """A new vector whose coordinates are scaled by the given `other` value."""
         return Vec2D(x=self._x * other, y=self._y * other)
 
 
     def __rmul__(self, other: int | float) -> Vec2D:
-        """A new vector whose coordinates are scaled by the given `other` value.
-
-        Arguments:
-            other: A scalar value to scale the values of the vector.
-        """
+        """A new vector whose coordinates are scaled by the given `other` value."""
         return Vec2D(x=self._x * other, y=self._y * other)
 
 
     def __add__(self, other: Vec2D) -> Vec2D:
-        """A new vector whose coordinates are sum of the vectors.
-
-        Arguments:
-            other: The vector to add to the vector's components.
-        """
+        """A new vector whose coordinates are sum of the vectors."""
         return Vec2D(x=self._x + other._x, y=self._y + other._y)
 
 
@@ -473,9 +517,6 @@ class Vec2D:
         vector's coordinates and the provided other vector's coordinates. If
         this vector is vector A and other is vector B, then the resulting
         vector will be the vector pointing from B to A.
-
-        Arguments:
-            other: The vector to find the difference between.
         """
         return Vec2D(x=self._x - other._x, y=self._y - other._y)
 
@@ -487,6 +528,7 @@ class Vec2D:
 # =============================================================================
 # Genetic Algorithm
 # =============================================================================
+
 
 def main(population_size: int, generations: int):
     """Runs a genetic algorithm that seeks to optimize the fuzzy sets for the Kessler game.
@@ -504,12 +546,13 @@ def main(population_size: int, generations: int):
     asteroids_ga.fitness_function_impl = ga_fitness
     asteroids_ga.chromosome_impl = ga_chromosome
 
-    best_chromosome = asteroids_ga.population[0]
+    # asteroids_ga.evolve()
+    # best_chromosome = asteroids_ga.population[0]
 
-    with open(SOLUTION_PATH, 'w') as file:
-        file.write(str(best_chromosome.fitness) + "," + str(population_size) + ", " + str(generations) + '\n')
-        for gene in best_chromosome:
-            file.write(str(gene.value) + '\n')
+    # with open(SOLUTION_PATH, 'w') as file:
+    #    file.write(str(best_chromosome.fitness) + "," + str(population_size) + ", " + str(generations) + '\n')
+    #    for gene in best_chromosome:
+    #        file.write(str(gene.value) + '\n')
 
 
 def ga_fitness(chromosome: Chromosome) -> float:
@@ -572,48 +615,17 @@ def generate_bullet_mfs():
 def generate_theta_delta_mfs():
     pass
 
+
 def generate_thrust_mfs():
     pass
+
 
 def generature_turn_mfs():
     pass
 
-# bullet_time['VS'] = fuzz.trimf(bullet_time.universe, [0.0, 0.0, 0.2])
-# bullet_time['S']  = fuzz.trimf(bullet_time.universe, [0.0, 0.2, 0.5])
-# bullet_time['M']  = fuzz.trimf(bullet_time.universe, [0.2, 0.5, 1.0])
-# bullet_time['L']  = fuzz.smf(bullet_time.universe,    0.5, 1.0)
-
-# theta_delta['NL'] = fuzz.zmf(theta_delta.universe,    -math.pi/30, -math.pi/45)
-# theta_delta['NM'] = fuzz.trimf(theta_delta.universe, [-math.pi/30, -math.pi/45, -math.pi/90])
-# theta_delta['NS'] = fuzz.trimf(theta_delta.universe, [-math.pi/45, -math.pi/90,  math.pi/90])
-# theta_delta['Z']  = fuzz.trimf(theta_delta.universe, [-math.pi/90,  0,           math.pi/90])
-# theta_delta['PS'] = fuzz.trimf(theta_delta.universe, [-math.pi/90,  math.pi/90,  math.pi/45])
-# theta_delta['PM'] = fuzz.trimf(theta_delta.universe, [ math.pi/90,  math.pi/45,  math.pi/30])
-# theta_delta['PL'] = fuzz.smf(theta_delta.universe,     math.pi/45,  math.pi/30)
-
-# threat_level['L']  = fuzz.trimf(threat_level.universe, [0.0,  0.0, 0.25])
-# threat_level['M']  = fuzz.trimf(threat_level.universe, [0.0,  0.3, 0.6])
-# threat_level['H']  = fuzz.trimf(threat_level.universe, [0.4,  0.7, 1.0])
-# threat_level['VH'] = fuzz.trimf(threat_level.universe, [0.75, 1.0, 1.0])
-
-# ship_thrust['Reverse']     = fuzz.trimf(ship_thrust.universe, [-500.0, -500.0, -300.0])
-# ship_thrust['SlowReverse'] = fuzz.trimf(ship_thrust.universe, [-400.0, -225.0,  -50.0])
-# ship_thrust['Zero']        = fuzz.trimf(ship_thrust.universe, [ -80.0,    0.0,   80.0])
-# ship_thrust['SlowForward'] = fuzz.trimf(ship_thrust.universe, [  50.0,  225.0,  400.0])
-# ship_thrust['Forward']     = fuzz.trimf(ship_thrust.universe, [ 300.0,  500.0,  500.0])
-
-# ship_turn['HardRight'] = fuzz.trimf(ship_turn.universe, [-180, -180, -120])
-# ship_turn['MedRight']  = fuzz.trimf(ship_turn.universe, [-180, -120,  -60])
-# ship_turn['Right']     = fuzz.trimf(ship_turn.universe, [-120,  -60,   60])
-# ship_turn['Zero']      = fuzz.trimf(ship_turn.universe, [ -60,    0,   60])
-# ship_turn['Left']      = fuzz.trimf(ship_turn.universe, [ -60,   60,  120])
-# ship_turn['MedLeft']   = fuzz.trimf(ship_turn.universe, [  60,  120,  180])
-# ship_turn['HardLeft']  = fuzz.trimf(ship_turn.universe, [ 120,  180,  180])
-
-
 
 CURRENT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-SOLUTION_PATH = os.path.join(CURRENT_DIRECTORY, 'solution.ga')
+SOLUTION_PATH = os.path.join(CURRENT_DIRECTORY, 'solution.dat')
 
 
 if __name__ == "__main__":
