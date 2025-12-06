@@ -29,6 +29,7 @@ file automatically and pull the gene data from it.
 import os
 import math
 import argparse
+import random
 
 import numpy as np
 import skfuzzy as fuzz
@@ -186,32 +187,33 @@ class FuzzyController(KesslerController):
         rules.append(ctrl.Rule(bullet_time['VS'] & theta_delta['PS'] & (threat_level['H'] | threat_level['VH']), (ship_thrust['SlowReverse'], ship_turn['HardLeft'],  ship_fire['Yes'], ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['VS'] & theta_delta['NL'] & (threat_level['L'] | threat_level['M']),  (ship_thrust['SlowForward'], ship_turn['HardLeft'],  ship_fire['No'],  ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['VS'] & theta_delta['PL'] & (threat_level['L'] | threat_level['M']),  (ship_thrust['SlowForward'], ship_turn['HardRight'], ship_fire['No'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['VS'] & threat_level['VH'], (ship_mine['Yes'])))
 
         rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['NM'],                                             (ship_thrust['SlowReverse'], ship_turn['MedRight'],  ship_fire['Yes'], ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['NS'],                                             (ship_thrust['SlowReverse'], ship_turn['Right'],     ship_fire['Yes'], ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['Z'],                                              (ship_thrust['SlowReverse'], ship_turn['Zero'],      ship_fire['Yes'], ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['PS'],                                             (ship_thrust['SlowReverse'], ship_turn['Left'],      ship_fire['Yes'], ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['PM'],                                             (ship_thrust['SlowReverse'], ship_turn['MedLeft'],   ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['NL'] & (threat_level['L'] | threat_level['M']),   (ship_thrust['Zero'],        ship_turn['HardLeft'],  ship_fire['No'],  ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['NL'] & (threat_level['H'] | threat_level['VH']),  (ship_thrust['Zero'],        ship_turn['HardRight'], ship_fire['No'],  ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['PL'] & (threat_level['L'] | threat_level['M']),   (ship_thrust['Forward'],     ship_turn['HardLeft'],  ship_fire['No'],  ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['PL'] & (threat_level['H'] | threat_level['VH']),  (ship_thrust['SlowForward'], ship_turn['HardLeft'],  ship_fire['No'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['NL'] & (threat_level['L'] | threat_level['M']),   (ship_thrust['Zero'],        ship_turn['HardLeft'],  ship_fire['Yes'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['NL'] & (threat_level['H'] | threat_level['VH']),  (ship_thrust['Zero'],        ship_turn['HardRight'], ship_fire['Yes'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['PL'] & (threat_level['L'] | threat_level['M']),   (ship_thrust['Forward'],     ship_turn['HardLeft'],  ship_fire['Yes'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['S'] & theta_delta['PL'] & (threat_level['H'] | threat_level['VH']),  (ship_thrust['SlowForward'], ship_turn['HardLeft'],  ship_fire['Yes'],  ship_mine['No'])))
 
-        rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['NL'],                                             (ship_thrust['SlowForward'], ship_turn['HardRight'], ship_fire['No'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['NL'],                                             (ship_thrust['SlowForward'], ship_turn['HardRight'], ship_fire['Yes'],  ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['NM'],                                             (ship_thrust['SlowForward'], ship_turn['MedRight'],  ship_fire['Yes'], ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['NS'],                                             (ship_thrust['SlowForward'], ship_turn['Right'],     ship_fire['Yes'], ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['Z'],                                              (ship_thrust['SlowForward'], ship_turn['Zero'],      ship_fire['Yes'], ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['PS'],                                             (ship_thrust['SlowForward'], ship_turn['Left'],      ship_fire['Yes'], ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['PM'],                                             (ship_thrust['SlowForward'], ship_turn['MedLeft'],   ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['PL'],                                             (ship_thrust['SlowForward'], ship_turn['HardLeft'],  ship_fire['No'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['M'] & theta_delta['PL'],                                             (ship_thrust['SlowForward'], ship_turn['HardLeft'],  ship_fire['Yes'],  ship_mine['No'])))
 
-        rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['NL'],                                             (ship_thrust['SlowForward'], ship_turn['HardRight'], ship_fire['No'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['NL'],                                             (ship_thrust['SlowForward'], ship_turn['HardRight'], ship_fire['Yes'], ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['NM'],                                             (ship_thrust['Forward'],     ship_turn['MedRight'],  ship_fire['Yes'], ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['NS'],                                             (ship_thrust['Forward'],     ship_turn['Right'],     ship_fire['Yes'], ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['Z'],                                              (ship_thrust['Forward'],     ship_turn['Zero'],      ship_fire['Yes'], ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['PS'],                                             (ship_thrust['Forward'],     ship_turn['Left'],      ship_fire['Yes'], ship_mine['No'])))
         rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['PM'],                                             (ship_thrust['Forward'],     ship_turn['MedLeft'],   ship_fire['Yes'], ship_mine['No'])))
-        rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['PL'],                                             (ship_thrust['SlowForward'], ship_turn['HardLeft'],  ship_fire['No'],  ship_mine['No'])))
+        rules.append(ctrl.Rule(bullet_time['L'] & theta_delta['PL'],                                             (ship_thrust['SlowForward'], ship_turn['HardLeft'],  ship_fire['Yes'], ship_mine['No'])))
 
         self.control_system = ctrl.ControlSystem(rules)
 
@@ -490,27 +492,27 @@ class Vec2D:
         return math.atan2(self._y, self.x)
 
 
-    def dot_prod(self, other: Vec2D) -> int | float:
+    def dot_prod(self, other: 'Vec2D') -> int | float:
         """Returns the dot product of the vector with the given vector."""
         return self._x * other._x + self._y * other._y
 
 
-    def __mul__(self, other: int | float) -> Vec2D:
+    def __mul__(self, other: int | float) -> 'Vec2D':
         """A new vector whose coordinates are scaled by the given `other` value."""
         return Vec2D(x=self._x * other, y=self._y * other)
 
 
-    def __rmul__(self, other: int | float) -> Vec2D:
+    def __rmul__(self, other: int | float) -> 'Vec2D':
         """A new vector whose coordinates are scaled by the given `other` value."""
         return Vec2D(x=self._x * other, y=self._y * other)
 
 
-    def __add__(self, other: Vec2D) -> Vec2D:
+    def __add__(self, other: 'Vec2D') -> 'Vec2D':
         """A new vector whose coordinates are sum of the vectors."""
         return Vec2D(x=self._x + other._x, y=self._y + other._y)
 
 
-    def __sub__(self, other: Vec2D) -> Vec2D:
+    def __sub__(self, other: 'Vec2D') -> 'Vec2D':
         """A new vector whose coordinates are the difference of the vectors.
 
         Produces a vector whose coordinates are the difference between this
@@ -545,14 +547,27 @@ def main(population_size: int, generations: int):
     asteroids_ga.chromosome_length = 78
     asteroids_ga.fitness_function_impl = ga_fitness
     asteroids_ga.chromosome_impl = ga_chromosome
+    asteroids_ga.mutation_individual_impl = mutation
 
-    # asteroids_ga.evolve()
-    # best_chromosome = asteroids_ga.population[0]
+    asteroids_ga.evolve()
+    best_chromosome = asteroids_ga.population[0]
 
-    # with open(SOLUTION_PATH, 'w') as file:
-    #    file.write(str(best_chromosome.fitness) + "," + str(population_size) + ", " + str(generations) + '\n')
-    #    for gene in best_chromosome:
-    #        file.write(str(gene.value) + '\n')
+    with open(SOLUTION_PATH, 'w') as file:
+       file.write(str(best_chromosome.fitness) + "," + str(population_size) + ", " + str(generations) + '\n')
+       for gene in best_chromosome:
+           file.write(str(gene.value) + '\n')
+
+
+def mutation(ga, chromosome):
+    index = random.randrange(len(chromosome))
+    gene = chromosome[index]
+    gene += random.uniform(-0.1, 0.1)
+    # if (index == 0 or index == 11 or index == 30 or index == 45):
+    #     isFirstInRange()
+    # elif (index == 10 or index == 29 or index == 44 or index == 65):
+    #     isLastInRange()
+    # else:
+    #     ensureNewBetweenPreviousAndFollowing()
 
 
 def ga_fitness(chromosome: Chromosome) -> float:
@@ -582,7 +597,7 @@ def ga_fitness(chromosome: Chromosome) -> float:
     # asteroids until they reach size 1 giving us 10 * SUM(3^n) for n=0 to n = 3
     # asteroids which is 400 in total.
     fraction_asteroids = team.asteroids_hit / 400.0
-    fraction_deaths = team.deaths / 3.0
+    fraction_deaths = 1 - (team.deaths / 3.0)
 
     # These three terms are the most important to the game's score with the
     # number of asteroids being the most important and accuracy close by (for
@@ -603,25 +618,40 @@ def ga_chromosome() -> list[float]:
 def generate_bullet_mfs():
     min_point = float(min(BULLET_TIME_UNIVERSE))
     max_point = float(max(BULLET_TIME_UNIVERSE))
-    vs_rightpoint = np.random.uniform(min_point, 0.4)
-    vs_points = [min_point, min_point, vs_rightpoint]
-
-    s_leftpoint = np.random.uniform(min_point, vs_rightpoint)
-    s_rightpoint = np.random.uniform(vs_rightpoint, 0.8)
-    s_midpoint = np.random.uniform(s_leftpoint, s_rightpoint)
-    s_points = [s_leftpoint, s_midpoint, s_rightpoint]
+    point = []
+    for i in range (11):
+        point.append(np.random.uniform(min_point, max_point))
+    point.sort()
+    return point
 
 
 def generate_theta_delta_mfs():
-    pass
-
+    min_point = float(min(THETA_DELTA_UNIVERSE))
+    max_point = float(max(THETA_DELTA_UNIVERSE))
+    point = []
+    for i in range (19):
+        point.append(np.random.uniform(min_point, max_point))
+    point.sort()
+    return point
 
 def generate_thrust_mfs():
-    pass
+    min_point = float(min(SHIP_THRUST_UNIVERSE))
+    max_point = float(max(SHIP_THRUST_UNIVERSE))
+    point = []
+    for i in range (15):
+        point.append(np.random.uniform(min_point, max_point))
+    point.sort()
+    return point
 
 
 def generature_turn_mfs():
-    pass
+    min_point = float(min(SHIP_TURN_UNIVERSE))
+    max_point = float(max(SHIP_TURN_UNIVERSE))
+    point = []
+    for i in range (21):
+        point.append(np.random.uniform(min_point, max_point))
+    point.sort()
+    return point
 
 
 CURRENT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
