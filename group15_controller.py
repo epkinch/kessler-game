@@ -137,8 +137,8 @@ class FuzzyController(KesslerController):
         else:
             bullet_time['VS'] = fuzz.trimf(bullet_time.universe, [0.0, 0.0, chromosome[0]])
             bullet_time['S']  = fuzz.trimf(bullet_time.universe, [0.0, chromosome[0], chromosome[1]])
-            bullet_time['M']  = fuzz.trimf(bullet_time.universe, [chromosome[0], chromosome[1], 1.0])
-            bullet_time['L']  = fuzz.smf(bullet_time.universe,    chromosome[1], 1.0)
+            bullet_time['M']  = fuzz.trimf(bullet_time.universe, [chromosome[0], chromosome[1], 1.7])
+            bullet_time['L']  = fuzz.smf(bullet_time.universe,    chromosome[1], 1.7)
 
             theta_delta['NL'] = fuzz.zmf(theta_delta.universe,    -math.pi/30, -math.pi/45)
             theta_delta['NM'] = fuzz.trimf(theta_delta.universe, [-math.pi/30, -math.pi/45, chromosome[2]])
