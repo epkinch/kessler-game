@@ -660,8 +660,8 @@ def generate_bullet_mfs():
     return points
 
 def generate_theta_delta_mfs():
-    min_point = float(min(THETA_DELTA_UNIVERSE))
-    max_point = float(max(THETA_DELTA_UNIVERSE))
+    min_point = -math.pi/45
+    max_point = math.pi/45
     points = []
     for _ in range(3):
         point = np.random.uniform(min_point, max_point)
@@ -672,8 +672,8 @@ def generate_theta_delta_mfs():
     return points
 
 def generate_threat_mfs():
-    min_point = -math.pi/45
-    max_point = math.pi/45
+    min_point = min(THREAT_LEVEL_UNIVERSE)
+    max_point = max(THREAT_LEVEL_UNIVERSE)
     points = []
     for _ in range(2):
         point = np.random.uniform(min_point, max_point)
