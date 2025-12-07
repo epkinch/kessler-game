@@ -30,6 +30,8 @@ import os
 import math
 import argparse
 import random
+import time
+import traceback
 
 import numpy as np
 import skfuzzy as fuzz
@@ -37,15 +39,15 @@ from skfuzzy import control as ctrl
 import EasyGA as GA
 
 # Only imported for type hinting
-from EasyGA.structure import Chromosome
+from EasyGA.structure import Chromosome, Gene
 from kesslergame.state_models import GameState, ShipState, AsteroidView
 
 from kesslergame import KesslerController, Scenario, TrainerEnvironment
 
 
-BULLET_TIME_UNIVERSE  = np.linspace(0, 1.7, 1001)
+BULLET_TIME_UNIVERSE  = np.linspace(0.0, 1.7, 1001)
 THETA_DELTA_UNIVERSE  = np.linspace(-math.pi, math.pi, 181)
-THREAT_LEVEL_UNIVERSE = np.linspace(0, 1.0, 11)
+THREAT_LEVEL_UNIVERSE = np.linspace(0.0, 1.0, 11)
 SHIP_THRUST_UNIVERSE  = np.linspace(-480.0, 480.0, 100)
 SHIP_TURN_UNIVERSE    = np.linspace(-180.0, 180.0, 361)
 
@@ -88,9 +90,9 @@ class FuzzyController(KesslerController):
         if os.path.isfile(SOLUTION_PATH) and chromosome is None:
             with open(SOLUTION_PATH, 'r') as file:
                 lines = file.readlines()
-                training_data = lines[0].split(", ")
+                training_data = lines[0].split(",")
                 print(f"Solution exists in solution.dat whose fitness is {training_data[0]} (fitness is between 0.0 and 1.0).")
-                print(f"This was obtained using a population size of {training_data[1]} and a generation goal of {training_data[2]}.")
+                print(f"This was obtained using a population size of {training_data[1]} and a generation goal of {training_data[2].strip('\n')}.")
                 chromosome = Chromosome([float(value) for value in lines[1:]])
 
         # Fallback values for if the genetic algorithm has not been run.
@@ -135,37 +137,38 @@ class FuzzyController(KesslerController):
             ship_turn['MedLeft']   = fuzz.trimf(ship_turn.universe, [  60,  120,  180])
             ship_turn['HardLeft']  = fuzz.trimf(ship_turn.universe, [ 120,  180,  180])
         else:
-            bullet_time['VS'] = fuzz.trimf(bullet_time.universe, [0.0, 0.0, chromosome[0]])
-            bullet_time['S']  = fuzz.trimf(bullet_time.universe, [0.0, chromosome[0], chromosome[1]])
+            chromosome = [gene.value for gene in chromosome]
+            bullet_time['VS'] = fuzz.trimf(bullet_time.universe, [0.0,           0.0,           chromosome[0]])
+            bullet_time['S']  = fuzz.trimf(bullet_time.universe, [0.0,           chromosome[0], chromosome[1]])
             bullet_time['M']  = fuzz.trimf(bullet_time.universe, [chromosome[0], chromosome[1], 1.7])
             bullet_time['L']  = fuzz.smf(bullet_time.universe,    chromosome[1], 1.7)
 
-            theta_delta['NL'] = fuzz.zmf(theta_delta.universe,    -math.pi/30, -math.pi/45)
-            theta_delta['NM'] = fuzz.trimf(theta_delta.universe, [-math.pi/30, -math.pi/45, chromosome[2]])
-            theta_delta['NS'] = fuzz.trimf(theta_delta.universe, [-math.pi/45, chromosome[2],  chromosome[3]])
+            theta_delta['NL'] = fuzz.zmf(theta_delta.universe,    -math.pi/30,   -math.pi/45)
+            theta_delta['NM'] = fuzz.trimf(theta_delta.universe, [-math.pi/30,   -math.pi/45,   chromosome[2]])
+            theta_delta['NS'] = fuzz.trimf(theta_delta.universe, [-math.pi/45,   chromosome[2], chromosome[3]])
             theta_delta['Z']  = fuzz.trimf(theta_delta.universe, [chromosome[2], chromosome[3], chromosome[4]])
-            theta_delta['PS'] = fuzz.trimf(theta_delta.universe, [chromosome[3],  chromosome[4],  math.pi/45])
-            theta_delta['PM'] = fuzz.trimf(theta_delta.universe, [ chromosome[4],  math.pi/45,  math.pi/30])
-            theta_delta['PL'] = fuzz.smf(theta_delta.universe,     math.pi/45,  math.pi/30)
+            theta_delta['PS'] = fuzz.trimf(theta_delta.universe, [chromosome[3], chromosome[4], math.pi/45])
+            theta_delta['PM'] = fuzz.trimf(theta_delta.universe, [chromosome[4], math.pi/45,    math.pi/30])
+            theta_delta['PL'] = fuzz.smf(theta_delta.universe,    math.pi/45,    math.pi/30)
 
-            threat_level['L']  = fuzz.trimf(threat_level.universe, [0.0,  0.0, chromosome[5]])
-            threat_level['M']  = fuzz.trimf(threat_level.universe, [0.0,  chromosome[5], chromosome[6]])
-            threat_level['H']  = fuzz.trimf(threat_level.universe, [chromosome[5],  chromosome[6], 1.0])
-            threat_level['VH'] = fuzz.trimf(threat_level.universe, [chromosome[6], 1.0, 1.0])
+            threat_level['L']  = fuzz.trimf(threat_level.universe, [0.0,           0.0,           chromosome[5]])
+            threat_level['M']  = fuzz.trimf(threat_level.universe, [0.0,           chromosome[5], chromosome[6]])
+            threat_level['H']  = fuzz.trimf(threat_level.universe, [chromosome[5], chromosome[6], 1.0])
+            threat_level['VH'] = fuzz.trimf(threat_level.universe, [chromosome[6], 1.0,           1.0])
 
-            ship_thrust['Reverse']     = fuzz.trimf(ship_thrust.universe, [-500.0, -500.0, chromosome[7]])
-            ship_thrust['SlowReverse'] = fuzz.trimf(ship_thrust.universe, [-500.0, chromosome[7],  chromosome[8]])
+            ship_thrust['Reverse']     = fuzz.trimf(ship_thrust.universe, [-500.0,        -500.0,        chromosome[7]])
+            ship_thrust['SlowReverse'] = fuzz.trimf(ship_thrust.universe, [-500.0,        chromosome[7], chromosome[8]])
             ship_thrust['Zero']        = fuzz.trimf(ship_thrust.universe, [chromosome[7], chromosome[8], chromosome[9]])
-            ship_thrust['SlowForward'] = fuzz.trimf(ship_thrust.universe, [chromosome[8],  chromosome[9],  400.0])
-            ship_thrust['Forward']     = fuzz.trimf(ship_thrust.universe, [chromosome[9],  500.0,  500.0])
+            ship_thrust['SlowForward'] = fuzz.trimf(ship_thrust.universe, [chromosome[8], chromosome[9], 500.0])
+            ship_thrust['Forward']     = fuzz.trimf(ship_thrust.universe, [chromosome[9], 500.0,         500.0])
 
-            ship_turn['HardRight'] = fuzz.trimf(ship_turn.universe, [-180, -180, chromosome[10]])
-            ship_turn['MedRight']  = fuzz.trimf(ship_turn.universe, [-180, chromosome[10],  chromosome[11]])
-            ship_turn['Right']     = fuzz.trimf(ship_turn.universe, [chromosome[10], chromosome[11]], chromosome[12])
-            ship_turn['Zero']      = fuzz.trimf(ship_turn.universe, [chromosome[11]], chromosome[12], chromosome[13])
-            ship_turn['Left']      = fuzz.trimf(ship_turn.universe, [chromosome[12], chromosome[13],  chromosome[14]])
-            ship_turn['MedLeft']   = fuzz.trimf(ship_turn.universe, [chromosome[13],  chromosome[14],  180])
-            ship_turn['HardLeft']  = fuzz.trimf(ship_turn.universe, [ chromosome[14],  180,  180])
+            ship_turn['HardRight'] = fuzz.trimf(ship_turn.universe, [-180,           -180,           chromosome[10]])
+            ship_turn['MedRight']  = fuzz.trimf(ship_turn.universe, [-180,           chromosome[10], chromosome[11]])
+            ship_turn['Right']     = fuzz.trimf(ship_turn.universe, [chromosome[10], chromosome[11], chromosome[12]])
+            ship_turn['Zero']      = fuzz.trimf(ship_turn.universe, [chromosome[11], chromosome[12], chromosome[13]])
+            ship_turn['Left']      = fuzz.trimf(ship_turn.universe, [chromosome[12], chromosome[13], chromosome[14]])
+            ship_turn['MedLeft']   = fuzz.trimf(ship_turn.universe, [chromosome[13], chromosome[14], 180])
+            ship_turn['HardLeft']  = fuzz.trimf(ship_turn.universe, [chromosome[14], 180,            180])
 
         # Output sets for fire and mine
         ship_fire['Yes'] = fuzz.trimf(ship_fire.universe, [ 0,  1, 1])
@@ -530,6 +533,8 @@ class Vec2D:
 # =============================================================================
 # Genetic Algorithm
 # =============================================================================
+genetic_start_time = 0
+time_training = False
 
 
 def main(population_size: int, generations: int):
@@ -540,6 +545,7 @@ def main(population_size: int, generations: int):
             generation.
         generations: The number of generations to evolve the algorithm over.
     """
+    global genetic_start_time
     asteroids_ga = GA.GA()
     asteroids_ga.fitness_goal = 'max'
     asteroids_ga.population_size = population_size
@@ -549,56 +555,103 @@ def main(population_size: int, generations: int):
     asteroids_ga.chromosome_impl = ga_chromosome
     asteroids_ga.mutation_individual_impl = mutation
 
+    if time_training:
+        genetic_start_time = time.time()
+
+    print("Begnning evolution...")
     asteroids_ga.evolve()
     best_chromosome = asteroids_ga.population[0]
+    print("Evolution finished...\n")
+    print("The best chromosome discovered was:")
     print(best_chromosome)
 
+    if time_training:
+        print(f"Total time elapsed: {format_time(time.time() - genetic_start_time, True)}")
+
     with open(SOLUTION_PATH, 'w') as file:
-       file.write(str(best_chromosome.fitness) + "," + str(population_size) + ", " + str(generations) + '\n')
-       for gene in best_chromosome:
-           file.write(str(gene.value) + '\n')
+        file.write(str(best_chromosome.fitness) + "," + str(population_size) + "," + str(generations) + '\n')
+
+        for idx, gene in enumerate(best_chromosome):
+            if idx == (len(best_chromosome) - 1):
+                file.write(str(gene.value))
+            else:
+                file.write(str(gene.value) + '\n')
 
 
-def mutation(ga, chromosome):
-    mutation_distance = 0.1
+def mutation(ga: GA.GA, chromosome: Chromosome):
+    """Applies a random mutation to the given chromosome.
+
+    If a mutation cannot be applied, then the given chromosome will be the
+    chromosome returned.
+
+    Arguments:
+        ga: The genetic algorithm being used.
+        chromosome: The chromosome to apply a mutation to.
+    """
     index = random.randrange(len(chromosome))
-    gene = chromosome[index].value
-    
-    if 0 <= index <= 1:
-        mutation_distance *= max(BULLET_TIME_UNIVERSE)
-        gene += np.random.uniform(-mutation_distance, mutation_distance)
-        if gene < min(BULLET_TIME_UNIVERSE) or gene > max(BULLET_TIME_UNIVERSE):
-            return chromosome
-    elif 2 <= index <= 4:
-        mutation_distance *= 2*math.pi/45
-        gene += np.random.uniform(-mutation_distance, mutation_distance)
-        if gene < -math.pi/45 or gene > math.pi/45:
-            return chromosome
-    elif 5 <= index <= 6:
-        mutation_distance *= max(THREAT_LEVEL_UNIVERSE)
-        gene += np.random.uniform(-mutation_distance, mutation_distance)
-        if gene < min(THREAT_LEVEL_UNIVERSE) or gene > max(THREAT_LEVEL_UNIVERSE):
-            return chromosome
-    elif 7 <= index <= 9:
-        mutation_distance *= max(SHIP_THRUST_UNIVERSE)
-        gene += np.random.uniform(-mutation_distance, mutation_distance)
-        if gene < min(SHIP_THRUST_UNIVERSE) or gene > max(SHIP_THRUST_UNIVERSE):
-            return chromosome
-    elif 10 <= index <= 14:
-        mutation_distance *= max(SHIP_TURN_UNIVERSE)
-        gene += np.random.uniform(-mutation_distance, mutation_distance)
-        if gene < min(SHIP_TURN_UNIVERSE) or gene > max(SHIP_TURN_UNIVERSE):
+    retry_mutation = True
+
+    # Nudge the existing value of a gene based on the maximum value it can take
+    # on in its universe. If the new value is outside the universe, then retry
+    # the mutation.
+    while retry_mutation:
+        mutation_distance = 0.1
+        gene_value = chromosome[index].value
+
+        try:
+            if 0 <= index <= 1:
+                mutation_distance *= max(BULLET_TIME_UNIVERSE)
+                gene_value += np.random.uniform(-mutation_distance, mutation_distance)
+
+                if gene_value < min(BULLET_TIME_UNIVERSE) or gene_value > max(BULLET_TIME_UNIVERSE):
+                    continue
+            elif 2 <= index <= 4:
+                # We use pi/45 here rather than the universe size because the ship cannot
+                # rotate faster than pi/30 radians per tick and pi/45 is the next lowest
+                # value in the fuzzy sets for a maximum value.
+                mutation_distance *= (2 * math.pi/45)
+                gene_value += np.random.uniform(-mutation_distance, mutation_distance)
+
+                if gene_value < -math.pi/45 or gene_value > math.pi/45:
+                    continue
+            elif 5 <= index <= 6:
+                mutation_distance *= max(THREAT_LEVEL_UNIVERSE)
+                gene_value += np.random.uniform(-mutation_distance, mutation_distance)
+
+                if gene_value < min(THREAT_LEVEL_UNIVERSE) or gene_value > max(THREAT_LEVEL_UNIVERSE):
+                    continue
+            elif 7 <= index <= 9:
+                mutation_distance *= max(SHIP_THRUST_UNIVERSE)
+                gene_value += np.random.uniform(-mutation_distance, mutation_distance)
+
+                if gene_value < min(SHIP_THRUST_UNIVERSE) or gene_value > max(SHIP_THRUST_UNIVERSE):
+                    continue
+            elif 10 <= index <= 14:
+                mutation_distance *= max(SHIP_TURN_UNIVERSE)
+                gene_value += np.random.uniform(-mutation_distance, mutation_distance)
+
+                if gene_value < min(SHIP_TURN_UNIVERSE) or gene_value > max(SHIP_TURN_UNIVERSE):
+                    continue
+
+            # Check to see if the gene we are applying a mutation to is not an minimum
+            # value gene
+            if (index not in (0, 2, 5, 7, 10)):
+                if gene_value < chromosome[index - 1].value:
+                    continue
+
+            # Check to see if the gene we are applying a mutation to is not an maximum
+            # value gene
+            if (index not in (1, 4, 6, 9, 14)):
+                if gene_value > chromosome[index + 1].value:
+                    continue
+
+            retry_mutation = False
+        except Exception as e:
+            print(f"Attempting to mutate gene {index} caused an issue:", e)
+            print(traceback.format_exc())
             return chromosome
  
-    if (index not in (0, 2, 5, 7, 10)):
-        if gene < chromosome[index-1]:
-            return chromosome
-        
-    if (index not in (1, 4, 6, 9, 14)):
-        if gene > chromosome[index+1]:
-            return chromosome
-
-    chromosome[index] = GA.Gene(gene)
+    chromosome[index] = Gene(gene_value)
     return chromosome
 
 
@@ -620,92 +673,127 @@ def ga_fitness(chromosome: Chromosome) -> float:
                                 time_limit=60,
                                 ammo_limit_multiplier=0,
                                 stop_if_no_ammo=False)
+    fitness = -1.0
 
-    game = TrainerEnvironment()
-    score, _ = game.run(scenario=my_test_scenario, controllers=[FuzzyController(chromosome)])
-    team = score.teams[0]
+    try:
+        controller = FuzzyController(chromosome)
+        game = TrainerEnvironment()
+        total_asteroids = 0
+        average_accuracy = 0.0
+        total_deaths = 0
+        total_bullets_shot = 0
+        total_bullets_hit = 0
+        num_games = 2
 
-    # We start with 10 asteroids with a size of 4, each can break into 3 smaller
-    # asteroids until they reach size 1 giving us 10 * SUM(3^n) for n=0 to n = 3
-    # asteroids which is 400 in total.
-    fraction_asteroids = team.asteroids_hit / 400.0
-    fraction_deaths = 1 - (team.deaths / 3.0)
+        for _ in range(num_games):
+            score, _ = game.run(scenario=my_test_scenario, controllers=[controller])
+            team = score.teams[0]
+            total_asteroids += team.asteroids_hit
+            total_bullets_shot += team.shots_fired
+            total_bullets_hit += team.bullets_hit
+            total_deaths += team.deaths
 
-    # These three terms are the most important to the game's score with the
-    # number of asteroids being the most important and accuracy close by (for
-    # breaking ties). Deaths are less important but still important for making
-    # the game last long.
-    return 0.45 * fraction_asteroids + 0.4 * team.accuracy + 0.15 * fraction_deaths
+        # We start with 10 asteroids with a size of 4 in each game. Each can
+        # break into 3 smaller asteroids until they reach size 1 giving us
+        # 10 * SUM(3^n) for n=0 to n = 3 asteroids which is 400 in total in
+        # one game.
+        fraction_asteroids = total_asteroids / (400.0 * num_games)
+        fraction_deaths = 1 - (total_deaths / (3.0 * num_games))
+        average_accuracy = total_bullets_hit / total_bullets_shot
+
+        # These three terms are the most important to the game's score with the
+        # number of asteroids being the most important and accuracy close by (for
+        # breaking ties). Deaths are less important but still important for making
+        # the game last long.
+        fitness = 0.5 * fraction_asteroids + 0.35 * average_accuracy + 0.15 * fraction_deaths
+        print(f"Fitness: {fitness}, Asteroids: {total_asteroids}, Accuracy: {average_accuracy}, Deaths: {total_deaths}")
+        print("Chromosome Data:")
+        print(chromosome)
+    except Exception as e:
+        print("Caught error when finding fitness:", e)
+        print("Chromosome that caused exception:")
+        print(chromosome)
+        print(traceback.format_exc())
+        # If for some reason we generate an invalid fuzzy set, then give a
+        # penalty to the chromosome.
+        fitness = -1.0
+
+    if time_training:
+        print(f"Total elapsed time: {format_time(time.time() - genetic_start_time, True)}\n")
+
+    return fitness
 
 # BM1
 def ga_chromosome() -> list[float]:
+    """Generates a new chromosome for the Kessler game fuzzy controller."""
     chromosome_data = []
-    chromosome_data.extend(generate_bullet_mfs())
-    chromosome_data.extend(generate_theta_delta_mfs())
-    chromosome_data.extend(generate_threat_mfs())
-    chromosome_data.extend(generate_thrust_mfs())
-    chromosome_data.extend(generature_turn_mfs())
+    chromosome_data.extend(generate_points(BULLET_TIME_UNIVERSE, 2))
+    chromosome_data.extend(generate_points([-math.pi/45, math.pi/45], 3))
+    chromosome_data.extend(generate_points(THREAT_LEVEL_UNIVERSE, 2))
+    chromosome_data.extend(generate_points(SHIP_THRUST_UNIVERSE, 3))
+    chromosome_data.extend(generate_points(SHIP_TURN_UNIVERSE, 5))
     return chromosome_data
 
-def generate_bullet_mfs():
-    min_point = float(min(BULLET_TIME_UNIVERSE))
-    max_point = float(max(BULLET_TIME_UNIVERSE))
+
+def generate_points(universe: np.array | list, num_points: int):
+    """Generates a given number of random points.
+
+    The points generated do not necessarily correspond to the points in the
+    universal set, but instead will fall between the maximum and minimum
+    values.
+
+    Arguments:
+        universe: The set of values in the universe of discourse.
+        num_points: The number of random points to generate.
+
+    Returns:
+        points: A list of randomly generated points that fall between the
+            maximum and minimum values in `universe` sorted from lowest
+            to highest.
+    """
+    min_point = float(min(universe))
+    max_point = float(max(universe))
     points = []
-    for _ in range(2):
+
+    for _ in range(num_points):
         point = np.random.uniform(min_point, max_point)
+
         while point in points:
             point = np.random.uniform(min_point, max_point)
+
         points.append(point)
+
     points.sort()
     return points
 
-def generate_theta_delta_mfs():
-    min_point = -math.pi/45
-    max_point = math.pi/45
-    points = []
-    for _ in range(3):
-        point = np.random.uniform(min_point, max_point)
-        while point in points:
-            point = np.random.uniform(min_point, max_point)
-        points.append(point)
-    points.sort()
-    return points
 
-def generate_threat_mfs():
-    min_point = min(THREAT_LEVEL_UNIVERSE)
-    max_point = max(THREAT_LEVEL_UNIVERSE)
-    points = []
-    for _ in range(2):
-        point = np.random.uniform(min_point, max_point)
-        while point in points:
-            point = np.random.uniform(min_point, max_point)
-        points.append(point)
-    points.sort()
-    return points
+def format_time(time_in_seconds: float, include_ms: bool=False):
+    """Formats the given time in the format {H}h {M}m {S}s.
 
-def generate_thrust_mfs():
-    min_point = float(min(SHIP_THRUST_UNIVERSE))
-    max_point = float(max(SHIP_THRUST_UNIVERSE))
-    points = []
-    for _ in range(3):
-        point = np.random.uniform(min_point, max_point)
-        while point in points:
-            point = np.random.uniform(min_point, max_point)
-        points.append(point)
-    points.sort()
-    return points
+    If the given time is less than 1 second or `include_ms` is `True`, then
+    the millisecond time will be appended to the time. By default, milliseconds
+    are only included if the time is less than 1 second.
 
-def generature_turn_mfs():
-    min_point = float(min(SHIP_TURN_UNIVERSE))
-    max_point = float(max(SHIP_TURN_UNIVERSE))
-    points = []
-    for _ in range(5):
-        point = np.random.uniform(min_point, max_point)
-        while point in points:
-            point = np.random.uniform(min_point, max_point)
-        points.append(point)
-    points.sort()
-    return points
+    Arguments:
+        time_in_seconds: The amount of time in seconds.
+        include_ms: If milliseconds should be included in the formatted time.
+    """
+    seconds = math.floor(time_in_seconds % 60)
+    milliseconds = round((time_in_seconds - math.floor(time_in_seconds)) * 1000)
+    time_string = ""
+
+    if time_in_seconds < 60:
+        time_string = f"{seconds}s"
+    elif time_in_seconds < 3600:
+        time_string = f"{int(time_in_seconds // 60)}m {seconds}s"
+    else:
+        time_string = f"{int(time_in_seconds // 3600)}h {int(time_in_seconds // 60)}m {seconds}s"
+
+    if time_in_seconds < 1 or include_ms:
+        time_string += f" {milliseconds}ms"
+
+    return time_string
+
 
 
 CURRENT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
@@ -719,9 +807,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="group15_controller.py", description=desc, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-p", "--population", help="the number of individuals in the GA's population between 1 and 50", metavar="[1-50]", default=20, type=int)
     parser.add_argument("-g", "--generations", help="the number of generations to evolve the GA over between 1 and 10,000", metavar="[1-10000]", default=10, type=int)
+    parser.add_argument("-t", "--timeit", help="if present, then timing information will be output as the genetic algorithm executes such as time passed and estimated time remaining", action="store_true")
     ns = parser.parse_args()
 
     if (ns.population < 1 or ns.population > 50) or (ns.generations < 1 or ns.generations > 10000):
         parser.print_usage()
     else:
+        time_training = ns.timeit
         main(ns.population, ns.generations)
