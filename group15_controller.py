@@ -551,6 +551,7 @@ def main(population_size: int, generations: int):
 
     asteroids_ga.evolve()
     best_chromosome = asteroids_ga.population[0]
+    print(best_chromosome)
 
     with open(SOLUTION_PATH, 'w') as file:
        file.write(str(best_chromosome.fitness) + "," + str(population_size) + ", " + str(generations) + '\n')
@@ -559,15 +560,49 @@ def main(population_size: int, generations: int):
 
 
 def mutation(ga, chromosome):
+    mutation_distance = 0.1
     index = random.randrange(len(chromosome))
     gene = chromosome[index]
-    gene += random.uniform(-0.1, 0.1)
-    # if (index == 0 or index == 11 or index == 30 or index == 45):
-    #     isFirstInRange()
-    # elif (index == 10 or index == 29 or index == 44 or index == 65):
-    #     isLastInRange()
-    # else:
-    #     ensureNewBetweenPreviousAndFollowing()
+    
+    if 0 <= index <= 10:
+        mutation_distance *= max(BULLET_TIME_UNIVERSE)
+        gene += np.random.uniform(-mutation_distance, mutation_distance)
+        if gene > max(BULLET_TIME_UNIVERSE):
+            return chromosome
+    elif 11 <= index <= 29:
+        mutation_distance *= max(THETA_DELTA_UNIVERSE)
+        gene += np.random.uniform(-mutation_distance, mutation_distance)
+        if gene > max(THETA_DELTA_UNIVERSE):
+            return chromosome
+    elif 30 <= index <= 41:
+        mutation_distance *= max(THREAT_LEVEL_UNIVERSE)
+        gene += np.random.uniform(-mutation_distance, mutation_distance)
+        if gene > max(THREAT_LEVEL_UNIVERSE):
+            return chromosome
+    elif 42 <= index <= 56:
+        mutation_distance *= max(SHIP_THRUST_UNIVERSE)
+        gene += np.random.uniform(-mutation_distance, mutation_distance)
+        if gene > max(SHIP_THRUST_UNIVERSE):
+            return chromosome
+    elif 57 <= index <= 77:
+        mutation_distance *= max(SHIP_TURN_UNIVERSE)
+        gene += np.random.uniform(-mutation_distance, mutation_distance)
+        if gene > max(SHIP_TURN_UNIVERSE):
+            return chromosome
+
+    if gene < 0:
+        return chromosome
+    
+    if (index not in (0, 11, 30, 42, 57)):
+        if gene < chromosome[index-1]:
+            return chromosome
+        
+    if (index not in (10, 29, 41, 56, 77)):
+        if gene > chromosome[index+1]:
+            return chromosome
+
+    chromosome[index] = gene
+    return chromosome
 
 
 def ga_fitness(chromosome: Chromosome) -> float:
@@ -605,11 +640,12 @@ def ga_fitness(chromosome: Chromosome) -> float:
     # the game last long.
     return 0.45 * fraction_asteroids + 0.4 * team.accuracy + 0.15 * fraction_deaths
 
-
+# BM1
 def ga_chromosome() -> list[float]:
     chromosome_data = []
     chromosome_data.extend(generate_bullet_mfs())
     chromosome_data.extend(generate_theta_delta_mfs())
+    chromosome_data.extend(generate_threat_mfs())
     chromosome_data.extend(generate_thrust_mfs())
     chromosome_data.extend(generature_turn_mfs())
     return chromosome_data
@@ -634,6 +670,15 @@ def generate_theta_delta_mfs():
     point.sort()
     return point
 
+def generate_threat_mfs():
+    min_point = float(min(THREAT_LEVEL_UNIVERSE))
+    max_point = float(max(THREAT_LEVEL_UNIVERSE))
+    point = []
+    for i in range (12):
+        point.append(np.random.uniform(min_point, max_point))
+    point.sort()
+    return point
+
 def generate_thrust_mfs():
     min_point = float(min(SHIP_THRUST_UNIVERSE))
     max_point = float(max(SHIP_THRUST_UNIVERSE))
@@ -642,7 +687,6 @@ def generate_thrust_mfs():
         point.append(np.random.uniform(min_point, max_point))
     point.sort()
     return point
-
 
 def generature_turn_mfs():
     min_point = float(min(SHIP_TURN_UNIVERSE))
