@@ -37,7 +37,7 @@ from skfuzzy import control as ctrl
 import EasyGA as ga
 
 # Only imported for type hinting
-from EasyGA.structure import Chromosome
+from EasyGA.structure import Chromosome, Gene
 from kesslergame.state_models import GameState, ShipState, AsteroidView
 
 from kesslergame import KesslerController, Scenario, TrainerEnvironment
@@ -135,6 +135,7 @@ class FuzzyController(KesslerController):
             ship_turn['MedLeft']   = fuzz.trimf(ship_turn.universe, [  60,  120,  180])
             ship_turn['HardLeft']  = fuzz.trimf(ship_turn.universe, [ 120,  180,  180])
         else:
+            chromosome = [gene.value for gene in chromosome]
             bullet_time['VS'] = fuzz.trimf(bullet_time.universe, chromosome[0:3])
             bullet_time['S']  = fuzz.trimf(bullet_time.universe, chromosome[3:6])
             bullet_time['M']  = fuzz.trimf(bullet_time.universe, chromosome[6:9])
@@ -562,7 +563,7 @@ def main(population_size: int, generations: int):
 def mutation(ga, chromosome):
     mutation_distance = 0.1
     index = random.randrange(len(chromosome))
-    gene = chromosome[index]
+    gene = chromosome[index].value
     
     if 0 <= index <= 10:
         mutation_distance *= max(BULLET_TIME_UNIVERSE)
@@ -594,14 +595,14 @@ def mutation(ga, chromosome):
         return chromosome
     
     if (index not in (0, 11, 30, 42, 57)):
-        if gene < chromosome[index-1]:
+        if gene < chromosome[index-1].value:
             return chromosome
         
     if (index not in (10, 29, 41, 56, 77)):
-        if gene > chromosome[index+1]:
+        if gene > chromosome[index+1].value:
             return chromosome
 
-    chromosome[index] = gene
+    chromosome[index] = Gene(gene)
     return chromosome
 
 
@@ -638,7 +639,9 @@ def ga_fitness(chromosome: Chromosome) -> float:
     # number of asteroids being the most important and accuracy close by (for
     # breaking ties). Deaths are less important but still important for making
     # the game last long.
-    return 0.45 * fraction_asteroids + 0.4 * team.accuracy + 0.15 * fraction_deaths
+    fitness =  0.45 * fraction_asteroids + 0.4 * team.accuracy + 0.15 * fraction_deaths
+    print("Fitness: ", fitness, "Asteroids: ", team.asteroids_hit, "Deaths: ", team.deaths, "Accuracy: ", team.accuracy)
+    return fitness
 
 # BM1
 def ga_chromosome() -> list[float]:
