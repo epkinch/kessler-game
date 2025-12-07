@@ -160,9 +160,9 @@ class FuzzyController(KesslerController):
             ship_thrust['Forward']     = fuzz.trimf(ship_thrust.universe, [chromosome[9],  500.0,  500.0])
 
             ship_turn['HardRight'] = fuzz.trimf(ship_turn.universe, [-180, -180, chromosome[10]])
-            ship_turn['MedRight']  = fuzz.trimf(ship_turn.universe, [-180, chromosome[10],  chromosome[11]]])
-            ship_turn['Right']     = fuzz.trimf(ship_turn.universe, [chromosome[10], chromosome[11]], chromosome[12]])
-            ship_turn['Zero']      = fuzz.trimf(ship_turn.universe, [chromosome[11]], chromosome[12], chromosome[13]])
+            ship_turn['MedRight']  = fuzz.trimf(ship_turn.universe, [-180, chromosome[10],  chromosome[11]])
+            ship_turn['Right']     = fuzz.trimf(ship_turn.universe, [chromosome[10], chromosome[11]], chromosome[12])
+            ship_turn['Zero']      = fuzz.trimf(ship_turn.universe, [chromosome[11]], chromosome[12], chromosome[13])
             ship_turn['Left']      = fuzz.trimf(ship_turn.universe, [chromosome[12], chromosome[13],  chromosome[14]])
             ship_turn['MedLeft']   = fuzz.trimf(ship_turn.universe, [chromosome[13],  chromosome[14],  180])
             ship_turn['HardLeft']  = fuzz.trimf(ship_turn.universe, [ chromosome[14],  180,  180])
