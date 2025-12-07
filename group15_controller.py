@@ -34,16 +34,16 @@ import random
 import numpy as np
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
-import EasyGA as ga
+import EasyGA as GA
 
 # Only imported for type hinting
-from EasyGA.structure import Chromosome, Gene
+from EasyGA.structure import Chromosome
 from kesslergame.state_models import GameState, ShipState, AsteroidView
 
 from kesslergame import KesslerController, Scenario, TrainerEnvironment
 
 
-BULLET_TIME_UNIVERSE  = np.linspace(0, 2.0, 1001)
+BULLET_TIME_UNIVERSE  = np.linspace(0, 1.7, 1001)
 THETA_DELTA_UNIVERSE  = np.linspace(-math.pi, math.pi, 181)
 THREAT_LEVEL_UNIVERSE = np.linspace(0, 1.0, 11)
 SHIP_THRUST_UNIVERSE  = np.linspace(-480.0, 480.0, 100)
@@ -135,38 +135,37 @@ class FuzzyController(KesslerController):
             ship_turn['MedLeft']   = fuzz.trimf(ship_turn.universe, [  60,  120,  180])
             ship_turn['HardLeft']  = fuzz.trimf(ship_turn.universe, [ 120,  180,  180])
         else:
-            chromosome = [gene.value for gene in chromosome]
-            bullet_time['VS'] = fuzz.trimf(bullet_time.universe, chromosome[0:3])
-            bullet_time['S']  = fuzz.trimf(bullet_time.universe, chromosome[3:6])
-            bullet_time['M']  = fuzz.trimf(bullet_time.universe, chromosome[6:9])
-            bullet_time['L']  = fuzz.smf(bullet_time.universe,   chromosome[9], chromosome[10])
+            bullet_time['VS'] = fuzz.trimf(bullet_time.universe, [0.0, 0.0, chromosome[0]])
+            bullet_time['S']  = fuzz.trimf(bullet_time.universe, [0.0, chromosome[0], chromosome[1]])
+            bullet_time['M']  = fuzz.trimf(bullet_time.universe, [chromosome[0], chromosome[1], 1.0])
+            bullet_time['L']  = fuzz.smf(bullet_time.universe,    chromosome[1], 1.0)
 
-            theta_delta['NL'] = fuzz.zmf(theta_delta.universe,   chromosome[11], chromosome[12])
-            theta_delta['NM'] = fuzz.trimf(theta_delta.universe, chromosome[13:16])
-            theta_delta['NS'] = fuzz.trimf(theta_delta.universe, chromosome[16:19])
-            theta_delta['Z']  = fuzz.trimf(theta_delta.universe, chromosome[19:22])
-            theta_delta['PS'] = fuzz.trimf(theta_delta.universe, chromosome[22:25])
-            theta_delta['PM'] = fuzz.trimf(theta_delta.universe, chromosome[25:28])
-            theta_delta['PL'] = fuzz.smf(theta_delta.universe,   chromosome[28], chromosome[29])
+            theta_delta['NL'] = fuzz.zmf(theta_delta.universe,    -math.pi/30, -math.pi/45)
+            theta_delta['NM'] = fuzz.trimf(theta_delta.universe, [-math.pi/30, -math.pi/45, chromosome[2]])
+            theta_delta['NS'] = fuzz.trimf(theta_delta.universe, [-math.pi/45, chromosome[2],  chromosome[3]])
+            theta_delta['Z']  = fuzz.trimf(theta_delta.universe, [chromosome[2], chromosome[3], chromosome[4]])
+            theta_delta['PS'] = fuzz.trimf(theta_delta.universe, [chromosome[3],  chromosome[4],  math.pi/45])
+            theta_delta['PM'] = fuzz.trimf(theta_delta.universe, [ chromosome[4],  math.pi/45,  math.pi/30])
+            theta_delta['PL'] = fuzz.smf(theta_delta.universe,     math.pi/45,  math.pi/30)
 
-            threat_level['L']  = fuzz.trimf(threat_level.universe, chromosome[30:33])
-            threat_level['M']  = fuzz.trimf(threat_level.universe, chromosome[33:36])
-            threat_level['H']  = fuzz.trimf(threat_level.universe, chromosome[36:39])
-            threat_level['VH'] = fuzz.trimf(threat_level.universe, chromosome[39:42])
+            threat_level['L']  = fuzz.trimf(threat_level.universe, [0.0,  0.0, chromosome[5]])
+            threat_level['M']  = fuzz.trimf(threat_level.universe, [0.0,  chromosome[5], chromosome[6]])
+            threat_level['H']  = fuzz.trimf(threat_level.universe, [chromosome[5],  chromosome[6], 1.0])
+            threat_level['VH'] = fuzz.trimf(threat_level.universe, [chromosome[6], 1.0, 1.0])
 
-            ship_thrust['Reverse']     = fuzz.trimf(ship_thrust.universe, chromosome[42:45])
-            ship_thrust['SlowReverse'] = fuzz.trimf(ship_thrust.universe, chromosome[45:48])
-            ship_thrust['Zero']        = fuzz.trimf(ship_thrust.universe, chromosome[48:51])
-            ship_thrust['SlowForward'] = fuzz.trimf(ship_thrust.universe, chromosome[51:54])
-            ship_thrust['Forward']     = fuzz.trimf(ship_thrust.universe, chromosome[54:57])
+            ship_thrust['Reverse']     = fuzz.trimf(ship_thrust.universe, [-500.0, -500.0, chromosome[7]])
+            ship_thrust['SlowReverse'] = fuzz.trimf(ship_thrust.universe, [-500.0, chromosome[7],  chromosome[8]])
+            ship_thrust['Zero']        = fuzz.trimf(ship_thrust.universe, [chromosome[7], chromosome[8], chromosome[9]])
+            ship_thrust['SlowForward'] = fuzz.trimf(ship_thrust.universe, [chromosome[8],  chromosome[9],  400.0])
+            ship_thrust['Forward']     = fuzz.trimf(ship_thrust.universe, [chromosome[9],  500.0,  500.0])
 
-            ship_turn['HardRight'] = fuzz.trimf(ship_turn.universe, chromosome[57:60])
-            ship_turn['MedRight']  = fuzz.trimf(ship_turn.universe, chromosome[60:63])
-            ship_turn['Right']     = fuzz.trimf(ship_turn.universe, chromosome[63:66])
-            ship_turn['Zero']      = fuzz.trimf(ship_turn.universe, chromosome[66:69])
-            ship_turn['Left']      = fuzz.trimf(ship_turn.universe, chromosome[69:72])
-            ship_turn['MedLeft']   = fuzz.trimf(ship_turn.universe, chromosome[72:75])
-            ship_turn['HardLeft']  = fuzz.trimf(ship_turn.universe, chromosome[75:78])
+            ship_turn['HardRight'] = fuzz.trimf(ship_turn.universe, [-180, -180, chromosome[10]])
+            ship_turn['MedRight']  = fuzz.trimf(ship_turn.universe, [-180, chromosome[10],  chromosome[11]]])
+            ship_turn['Right']     = fuzz.trimf(ship_turn.universe, [chromosome[10], chromosome[11]], chromosome[12]])
+            ship_turn['Zero']      = fuzz.trimf(ship_turn.universe, [chromosome[11]], chromosome[12], chromosome[13]])
+            ship_turn['Left']      = fuzz.trimf(ship_turn.universe, [chromosome[12], chromosome[13],  chromosome[14]])
+            ship_turn['MedLeft']   = fuzz.trimf(ship_turn.universe, [chromosome[13],  chromosome[14],  180])
+            ship_turn['HardLeft']  = fuzz.trimf(ship_turn.universe, [ chromosome[14],  180,  180])
 
         # Output sets for fire and mine
         ship_fire['Yes'] = fuzz.trimf(ship_fire.universe, [ 0,  1, 1])
@@ -541,11 +540,11 @@ def main(population_size: int, generations: int):
             generation.
         generations: The number of generations to evolve the algorithm over.
     """
-    asteroids_ga = ga.GA()
+    asteroids_ga = GA.GA()
     asteroids_ga.fitness_goal = 'max'
     asteroids_ga.population_size = population_size
     asteroids_ga.generation_goal = generations
-    asteroids_ga.chromosome_length = 78
+    asteroids_ga.chromosome_length = 15
     asteroids_ga.fitness_function_impl = ga_fitness
     asteroids_ga.chromosome_impl = ga_chromosome
     asteroids_ga.mutation_individual_impl = mutation
@@ -565,44 +564,41 @@ def mutation(ga, chromosome):
     index = random.randrange(len(chromosome))
     gene = chromosome[index].value
     
-    if 0 <= index <= 10:
+    if 0 <= index <= 1:
         mutation_distance *= max(BULLET_TIME_UNIVERSE)
         gene += np.random.uniform(-mutation_distance, mutation_distance)
-        if gene > max(BULLET_TIME_UNIVERSE):
+        if gene < min(BULLET_TIME_UNIVERSE) or gene > max(BULLET_TIME_UNIVERSE):
             return chromosome
-    elif 11 <= index <= 29:
-        mutation_distance *= max(THETA_DELTA_UNIVERSE)
+    elif 2 <= index <= 4:
+        mutation_distance *= 2*math.pi/45
         gene += np.random.uniform(-mutation_distance, mutation_distance)
-        if gene > max(THETA_DELTA_UNIVERSE):
+        if gene < -math.pi/45 or gene > math.pi/45:
             return chromosome
-    elif 30 <= index <= 41:
+    elif 5 <= index <= 6:
         mutation_distance *= max(THREAT_LEVEL_UNIVERSE)
         gene += np.random.uniform(-mutation_distance, mutation_distance)
-        if gene > max(THREAT_LEVEL_UNIVERSE):
+        if gene < min(THREAT_LEVEL_UNIVERSE) or gene > max(THREAT_LEVEL_UNIVERSE):
             return chromosome
-    elif 42 <= index <= 56:
+    elif 7 <= index <= 9:
         mutation_distance *= max(SHIP_THRUST_UNIVERSE)
         gene += np.random.uniform(-mutation_distance, mutation_distance)
-        if gene > max(SHIP_THRUST_UNIVERSE):
+        if gene < min(SHIP_THRUST_UNIVERSE) or gene > max(SHIP_THRUST_UNIVERSE):
             return chromosome
-    elif 57 <= index <= 77:
+    elif 10 <= index <= 14:
         mutation_distance *= max(SHIP_TURN_UNIVERSE)
         gene += np.random.uniform(-mutation_distance, mutation_distance)
-        if gene > max(SHIP_TURN_UNIVERSE):
+        if gene < min(SHIP_TURN_UNIVERSE) or gene > max(SHIP_TURN_UNIVERSE):
             return chromosome
-
-    if gene < 0:
-        return chromosome
-    
-    if (index not in (0, 11, 30, 42, 57)):
-        if gene < chromosome[index-1].value:
+ 
+    if (index not in (0, 2, 5, 7, 10)):
+        if gene < chromosome[index-1]:
             return chromosome
         
-    if (index not in (10, 29, 41, 56, 77)):
-        if gene > chromosome[index+1].value:
+    if (index not in (1, 4, 6, 9, 14)):
+        if gene > chromosome[index+1]:
             return chromosome
 
-    chromosome[index] = Gene(gene)
+    chromosome[index] = GA.Gene(gene)
     return chromosome
 
 
@@ -639,9 +635,7 @@ def ga_fitness(chromosome: Chromosome) -> float:
     # number of asteroids being the most important and accuracy close by (for
     # breaking ties). Deaths are less important but still important for making
     # the game last long.
-    fitness =  0.45 * fraction_asteroids + 0.4 * team.accuracy + 0.15 * fraction_deaths
-    print("Fitness: ", fitness, "Asteroids: ", team.asteroids_hit, "Deaths: ", team.deaths, "Accuracy: ", team.accuracy)
-    return fitness
+    return 0.45 * fraction_asteroids + 0.4 * team.accuracy + 0.15 * fraction_deaths
 
 # BM1
 def ga_chromosome() -> list[float]:
@@ -653,52 +647,65 @@ def ga_chromosome() -> list[float]:
     chromosome_data.extend(generature_turn_mfs())
     return chromosome_data
 
-
 def generate_bullet_mfs():
     min_point = float(min(BULLET_TIME_UNIVERSE))
     max_point = float(max(BULLET_TIME_UNIVERSE))
-    point = []
-    for i in range (11):
-        point.append(np.random.uniform(min_point, max_point))
-    point.sort()
-    return point
-
+    points = []
+    for _ in range(2):
+        point = np.random.uniform(min_point, max_point)
+        while point in points:
+            point = np.random.uniform(min_point, max_point)
+        points.append(point)
+    points.sort()
+    return points
 
 def generate_theta_delta_mfs():
     min_point = float(min(THETA_DELTA_UNIVERSE))
     max_point = float(max(THETA_DELTA_UNIVERSE))
-    point = []
-    for i in range (19):
-        point.append(np.random.uniform(min_point, max_point))
-    point.sort()
-    return point
+    points = []
+    for _ in range(3):
+        point = np.random.uniform(min_point, max_point)
+        while point in points:
+            point = np.random.uniform(min_point, max_point)
+        points.append(point)
+    points.sort()
+    return points
 
 def generate_threat_mfs():
-    min_point = float(min(THREAT_LEVEL_UNIVERSE))
-    max_point = float(max(THREAT_LEVEL_UNIVERSE))
-    point = []
-    for i in range (12):
-        point.append(np.random.uniform(min_point, max_point))
-    point.sort()
-    return point
+    min_point = -math.pi/45
+    max_point = math.pi/45
+    points = []
+    for _ in range(2):
+        point = np.random.uniform(min_point, max_point)
+        while point in points:
+            point = np.random.uniform(min_point, max_point)
+        points.append(point)
+    points.sort()
+    return points
 
 def generate_thrust_mfs():
     min_point = float(min(SHIP_THRUST_UNIVERSE))
     max_point = float(max(SHIP_THRUST_UNIVERSE))
-    point = []
-    for i in range (15):
-        point.append(np.random.uniform(min_point, max_point))
-    point.sort()
-    return point
+    points = []
+    for _ in range(3):
+        point = np.random.uniform(min_point, max_point)
+        while point in points:
+            point = np.random.uniform(min_point, max_point)
+        points.append(point)
+    points.sort()
+    return points
 
 def generature_turn_mfs():
     min_point = float(min(SHIP_TURN_UNIVERSE))
     max_point = float(max(SHIP_TURN_UNIVERSE))
-    point = []
-    for i in range (21):
-        point.append(np.random.uniform(min_point, max_point))
-    point.sort()
-    return point
+    points = []
+    for _ in range(5):
+        point = np.random.uniform(min_point, max_point)
+        while point in points:
+            point = np.random.uniform(min_point, max_point)
+        points.append(point)
+    points.sort()
+    return points
 
 
 CURRENT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
